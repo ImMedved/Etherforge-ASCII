@@ -15,3 +15,12 @@ test('vortex spells pull targets and control spells stun them', () => {
   applyAreaAbilityMechanics(state, { name: 'Резонанс', level: 4 }, [enemy], { x: 5, y: 5 }, 100);
   assert.equal(enemy.stunnedUntil, 1320);
 });
+
+test('control effects keep fractional coordinates in the real-time movement model', () => {
+  const enemy = { x: 8.35, y: 5.2, stunnedUntil: 0 };
+  const state = { world: { isPassable: () => true } };
+  const before = Math.hypot(enemy.x - 5.1, enemy.y - 5.05);
+  applyAreaAbilityMechanics(state, { name: 'Торнадо', level: 4 }, [enemy], { x: 5.1, y: 5.05 }, 100);
+  assert.ok(Math.hypot(enemy.x - 5.1, enemy.y - 5.05) < before);
+  assert.equal(Number.isInteger(enemy.x) && Number.isInteger(enemy.y), false);
+});

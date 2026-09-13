@@ -7,7 +7,7 @@ test('wolf, goblin and orc have distinct combat roles', () => {
   const wolf = createEnemy({ x: 1, y: 1 }, 1, 'wolf');
   const goblin = createEnemy({ x: 2, y: 2 }, 1, 'goblin');
   const orc = createEnemy({ x: 3, y: 3 }, 1, 'orc');
-  assert.ok(wolf.moveInterval < goblin.moveInterval && goblin.moveInterval < orc.moveInterval);
+  assert.ok(wolf.moveSpeed > goblin.moveSpeed && goblin.moveSpeed > orc.moveSpeed);
   assert.ok(wolf.maxHealth < goblin.maxHealth && goblin.maxHealth < orc.maxHealth);
   assert.ok(wolf.damage < goblin.damage && goblin.damage < orc.damage);
   assert.ok(Object.values(ENEMY_ARCHETYPES).every((enemy) => enemy.visionRange >= 22));

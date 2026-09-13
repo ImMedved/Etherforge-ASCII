@@ -25,7 +25,10 @@ function playerOrigin(player) {
   return { x: player.visualX ?? player.x, y: player.visualY ?? player.y };
 }
 
-function spawnRain(state, spell, target, profile, now) {
+function spawnRain(context, target, profile) {
+  const { state, spell, owner, team, now } = context;
+  const speedMultiplier = 1 + Math.max(0, owner?.projectileSpeedBonus ?? 0);
+  const rangeMultiplier = 1 + Math.max(0, owner?.spellRangeBonus ?? 0);
   for (let index = 0; index < profile.count; index += 1) {
     const angle = (index / profile.count) * Math.PI * 2;
     const origin = { x: target.x + Math.cos(angle) * 5, y: target.y + Math.sin(angle) * 5 };
@@ -35,37 +38,48 @@ function spawnRain(state, spell, target, profile, now) {
     };
     spawnProjectile(state, origin, landing, {
       ...profile,
-      range: profile.range * SPELL_RANGE_MULTIPLIER,
+      speed: profile.speed * speedMultiplier,
+      range: profile.range * SPELL_RANGE_MULTIPLIER * rangeMultiplier,
       level: spell.level,
       elements: spell.elements,
       damage: spell.damage * profile.damageScale,
       spellName: spell.name,
+      owner,
+      team,
+      context,
       delay: index * 65,
       ignoreObstacles: true,
     }, now);
   }
 }
 
-export function castProjectileAbility(state, spell, target, now) {
+export function castProjectileAbility(context, target) {
+  const { state, spell, owner, team, now } = context;
   const profile = PROFILES[spell.name];
   if (!profile) return null;
   if (profile.mode === 'rain') {
-    spawnRain(state, spell, target, profile, now);
+    spawnRain(context, target, profile);
     return { projectileCount: profile.count };
   }
 
   const count = profile.count ?? 1;
   const spread = profile.spread ?? 0;
-  const origin = playerOrigin(state.player);
+  const origin = playerOrigin(owner);
+  const speedMultiplier = 1 + Math.max(0, owner?.projectileSpeedBonus ?? 0);
+  const rangeMultiplier = 1 + Math.max(0, owner?.spellRangeBonus ?? 0);
   for (let index = 0; index < count; index += 1) {
     const centeredIndex = index - (count - 1) / 2;
     spawnProjectile(state, origin, target, {
       ...profile,
-      range: profile.range * SPELL_RANGE_MULTIPLIER,
+      speed: profile.speed * speedMultiplier,
+      range: profile.range * SPELL_RANGE_MULTIPLIER * rangeMultiplier,
       level: spell.level,
       elements: spell.elements,
       damage: spell.damage * profile.damageScale,
       spellName: spell.name,
+      owner,
+      team,
+      context,
       glyph: profile.glyphs?.[index % profile.glyphs.length] ?? profile.glyph,
       color: profile.colors?.[index % profile.colors.length] ?? profile.color,
       angleOffset: centeredIndex * spread,
@@ -76,3 +90,8 @@ export function castProjectileAbility(state, spell, target, now) {
 }
 
 export const PROJECTILE_SPELL_NAMES = Object.freeze(Object.keys(PROFILES));
+
+export function projectileRangeFor(spellName) {
+  const range = PROFILES[spellName]?.range;
+  return Number.isFinite(range) ? range * SPELL_RANGE_MULTIPLIER : null;
+}

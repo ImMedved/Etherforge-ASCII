@@ -1,4 +1,5 @@
 import { SEA_DEPTH, WORLD_SIZE } from '../config.js';
+import { PROLOGUE_HOUSES, PROLOGUE_VILLAGES } from '../data/prologue.js';
 
 function mulberry32(seed) {
   return function random() {
@@ -36,8 +37,10 @@ export function createWorld(seed = 9471) {
   }
 
   const clearings = [
-    { x: 29, y: 32, r: 8 },
-    { x: 27, y: 22, r: 5 },
+    { x: 16, y: 14, r: 7 },
+    { x: PROLOGUE_VILLAGES.portVillage.center.x, y: PROLOGUE_VILLAGES.portVillage.center.y, r: 12 },
+    { x: PROLOGUE_VILLAGES.undeadVillage.center.x, y: PROLOGUE_VILLAGES.undeadVillage.center.y, r: 17 },
+    { x: 23, y: 20, r: 5 },
   ];
   const isClearing = (x, y) => clearings.some((spot) => Math.hypot(x - spot.x, y - spot.y) < spot.r);
 
@@ -48,11 +51,36 @@ export function createWorld(seed = 9471) {
   }
 
   const spheres = [
-    { key: 1, elementId: 'air', name: 'Голубая сфера', color: 'air', x: 25, y: 22, active: true },
-    { key: 2, elementId: 'fire', name: 'Красная сфера', color: 'fire', x: 34, y: 30, active: true },
-    { key: 3, elementId: 'water', name: 'Синяя сфера', color: 'water', x: 24, y: 34, active: true },
-    { key: 4, elementId: 'earth', name: 'Зелёная сфера', color: 'earth', x: 30, y: 26, active: true },
+    { key: 1, elementId: 'air', name: 'Сфера Воздуха', color: 'air', x: 23, y: 20, active: true, story: true },
+    { key: 2, elementId: 'fire', name: 'Сфера Огня', color: 'fire', x: 90, y: 60, active: false, story: true },
+    { key: 3, elementId: 'water', name: 'Синяя сфера', color: 'water', x: 24, y: 34, active: false },
+    { key: 4, elementId: 'earth', name: 'Зелёная сфера', color: 'earth', x: 29, y: 26, active: false },
   ];
+  const villages = Object.values(PROLOGUE_VILLAGES);
+  const hub = { id: 'port-village', name: 'Сигнальный костёр Тихой Пристани', ...PROLOGUE_VILLAGES.portVillage.center };
+  const houses = PROLOGUE_HOUSES.map((house) => ({
+    ...house,
+    halfWidth: 4,
+    halfHeight: 3,
+    door: { x: house.x, y: house.y + 3 }
+  }));
+  const landmarks = [
+    { id: 'expedition-ship', type: 'ship', name: 'Корабль экспедиции', x: 12, y: 10 },
+    { id: 'port-square', type: 'square', name: 'Площадь Тихой Пристани', ...PROLOGUE_VILLAGES.portVillage.center },
+    { id: 'undead-outskirts', type: 'marker', name: 'Окраины Мёртвой Лощины', x: 66, y: 58 },
+    { id: 'undead-square', type: 'square', name: 'Площадь Мёртвой Лощины', x: 76, y: 64 },
+    { id: 'cemetery', type: 'cemetery', name: 'Старое кладбище', x: 84, y: 70 },
+    { id: 'lich-tower', type: 'tower', name: 'Башня лича', x: 90, y: 60 }
+  ];
+  const chests = PROLOGUE_HOUSES.map((house) => ({
+    id: 'cache-' + house.id,
+    houseId: house.id,
+    name: 'Сундук: ' + house.name,
+    x: house.x + 1,
+    y: house.y,
+    active: false,
+    opened: false
+  }));
 
   const world = {
     size: WORLD_SIZE,
@@ -60,6 +88,11 @@ export function createWorld(seed = 9471) {
     blocked,
     decorations,
     spheres,
+    villages,
+    hub,
+    houses,
+    landmarks,
+    chests,
     getTile(x, y) {
       if (x < 0 || y < 0 || x >= WORLD_SIZE || y >= WORLD_SIZE) return 'void';
       if (y < SEA_DEPTH) return 'water';
@@ -67,11 +100,25 @@ export function createWorld(seed = 9471) {
       return 'grass';
     },
     isPassable(x, y) {
+      const blockedByHouse = houses.some((house) => {
+        const localX = x - house.x;
+        const localY = y - house.y;
+        const onVerticalWall = Math.abs(localX) === house.halfWidth && Math.abs(localY) <= house.halfHeight;
+        const onHorizontalWall = Math.abs(localY) === house.halfHeight && Math.abs(localX) <= house.halfWidth;
+        const isDoor = x === house.door.x && y === house.door.y;
+        return (onVerticalWall || onHorizontalWall) && !isDoor;
+      });
       return Number.isInteger(x)
         && Number.isInteger(y)
         && this.getTile(x, y) !== 'water'
         && this.getTile(x, y) !== 'void'
-        && !blocked.has(tileKey(x, y));
+        && !blocked.has(tileKey(x, y))
+        && !blockedByHouse;
+    },
+    houseAt(point) {
+      return houses.find((house) =>
+        Math.abs(point.x - house.x) < house.halfWidth
+        && Math.abs(point.y - house.y) < house.halfHeight) || null;
     },
     findSpawn(excluded = [], minDistance = 7, maxDistance = null) {
       const points = excluded.filter(Boolean);
@@ -86,7 +133,8 @@ export function createWorld(seed = 9471) {
         const farEnough = points.every((point) => Math.hypot(point.x - x, point.y - y) >= minDistance);
         const closeEnough = !maxDistance || !anchor || Math.hypot(anchor.x - x, anchor.y - y) <= maxDistance;
         const sphereFree = !this.spheres.some((sphere) => sphere.active && sphere.x === x && sphere.y === y);
-        if (this.isPassable(x, y) && farEnough && closeEnough && sphereFree) {
+        const objectFree = !this.chests.some((chest) => chest.x === x && chest.y === y);
+        if (this.isPassable(x, y) && farEnough && closeEnough && sphereFree && objectFree) {
           return { x, y };
         }
       }

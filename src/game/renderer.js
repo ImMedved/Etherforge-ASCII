@@ -2,6 +2,8 @@ import { ELEMENTS, VIEWPORT_COLS, VIEWPORT_ROWS } from '../config.js';
 import { terrainSample } from './terrain-pattern.js';
 import { lightingFromAnimations, sampleAmbientSpherePulse, sampleAnimation, sampleStatusParticles } from './animations/primitives.js';
 import { sampleSignatureSpell } from './animations/signature-spells.js';
+import { pointsOnLine } from './entities.js';
+import { abilityRange, clampTarget, spellTargeting } from './spell-system.js';
 
 const COLORS = {
   grass: '#315e3c', grass2: '#4c7953', sand: '#8b815a', water: '#26728a', foam: '#75d5df',
@@ -9,7 +11,20 @@ const COLORS = {
   air: '#9beeff', fire: '#ff6a55', earth: '#6ddb76', damage: '#ff4f45', heal: '#62ef82',
   void: '#07100b', ui: '#d9f4df',
   ghost: '#b9e8ea',
+  preview: '#b8ffd0', danger: '#ff4f45',
+  amber: '#f4be6a',
+  village: '#b8a77a', undead: '#92a6a0',
 };
+
+function ringPoints(center, radius, count = null) {
+  const points = [];
+  const steps = count ?? Math.max(12, Math.ceil(radius * 10));
+  for (let index = 0; index < steps; index += 1) {
+    const angle = index / steps * Math.PI * 2;
+    points.push({ x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius });
+  }
+  return points;
+}
 
 export const ENEMY_SPRITES = Object.freeze({
   wolf: [
@@ -104,20 +119,21 @@ export class AsciiRenderer {
     return { x: Math.round(this.centerX + (dx - dy) * 2), y: Math.round(this.centerY + dx + dy) };
   }
 
-  screenToWorld(screenX, screenY, camera) {
+  screenToWorld(screenX, screenY, camera, snap = true) {
     const axis = (screenX - this.centerX) / 2;
     const depth = screenY - this.centerY;
-    return {
-      x: Math.round(camera.x + (axis + depth) / 2),
-      y: Math.round(camera.y + (depth - axis) / 2),
+    const point = {
+      x: camera.x + (axis + depth) / 2,
+      y: camera.y + (depth - axis) / 2,
     };
+    return snap ? { x: Math.round(point.x), y: Math.round(point.y) } : point;
   }
 
   pointerToWorld(event, camera) {
     const rect = this.element.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * this.cols;
     const y = ((event.clientY - rect.top) / rect.height) * this.rows;
-    return this.screenToWorld(x, y, camera);
+    return this.screenToWorld(x, y, camera, false);
   }
 
   render(state, now) {
@@ -146,6 +162,42 @@ export class AsciiRenderer {
         const globalY = sy - this.centerY + camera.x + camera.y;
         const sample = terrainSample(tile, globalX, globalY, now);
         plot(sx, sy, sample.char, sample.color);
+      }
+    }
+
+    if (state.preparedSpell && state.aimTarget) {
+      const origin = state.player;
+      const target = spellTargeting(state.preparedSpell) === 'self'
+        ? { x: origin.x, y: origin.y }
+        : clampTarget(origin, state.aimTarget, abilityRange(state.preparedSpell, origin));
+      for (const point of ringPoints(origin, abilityRange(state.preparedSpell, origin), 96)) {
+        const screen = this.project(point, camera);
+        plot(screen.x, screen.y, '·', 'preview');
+      }
+      if (spellTargeting(state.preparedSpell) === 'line') {
+        for (const point of pointsOnLine(origin, target)) {
+          const screen = this.project(point, camera);
+          plot(screen.x, screen.y, '=', 'preview');
+        }
+      }
+      const previewRadius = state.preparedSpell.radius * (1 + Math.max(0, origin.areaSizeBonus ?? 0));
+      for (const point of ringPoints(target, Math.max(0.8, previewRadius))) {
+        const screen = this.project(point, camera);
+        plot(screen.x, screen.y, 'X', 'preview');
+      }
+    }
+
+    for (const telegraph of state.telegraphs ?? []) {
+      const pulse = Math.floor((now - telegraph.createdAt) / 100) % 2 ? telegraph.glyph : 'x';
+      if (telegraph.shape === 'line') {
+        for (const point of pointsOnLine(telegraph.origin, telegraph.target)) {
+          const screen = this.project(point, camera);
+          plot(screen.x, screen.y, pulse, telegraph.color);
+        }
+      }
+      for (const point of ringPoints(telegraph.target, Math.max(0.9, telegraph.radius))) {
+        const screen = this.project(point, camera);
+        plot(screen.x, screen.y, pulse, telegraph.color);
       }
     }
 
@@ -193,6 +245,81 @@ export class AsciiRenderer {
         const pulseScreen = this.project(particle, camera);
         plot(pulseScreen.x, pulseScreen.y + Math.round(particle.screenDy ?? 0), particle.glyph, particle.color);
       }
+    }
+
+    for (const house of state.world.houses ?? []) {
+      const inside = state.world.houseAt(state.player)?.id === house.id;
+      const screen = this.project(house, camera);
+      if (!inside) {
+        text(screen.x - 9, screen.y - 7, '       /\\       ', 'village');
+        text(screen.x - 9, screen.y - 6, '     /####\\     ', 'village');
+        text(screen.x - 9, screen.y - 5, '   /########\\   ', 'village');
+        text(screen.x - 9, screen.y - 4, ' /############\\ ', 'village');
+        text(screen.x - 9, screen.y - 3, '/______________\\', 'village');
+        text(screen.x - 7, screen.y - 2, '| []  []  [] |', 'rock');
+        text(screen.x - 7, screen.y - 1, '|     __     |', 'rock');
+        text(screen.x - 7, screen.y, '|____|  |____|', 'rock');
+      } else {
+        for (let x = -house.halfWidth + 1; x < house.halfWidth; x += 1) {
+          for (let y = -house.halfHeight + 1; y < house.halfHeight; y += 1) {
+            const floor = this.project({ x: house.x + x, y: house.y + y }, camera);
+            plot(floor.x, floor.y, (x + y) % 2 ? '.' : ',', 'village');
+          }
+        }
+        text(screen.x - 8, screen.y - 5, '[ КРЫША СКРЫТА ]', 'amber');
+        text(screen.x - 5, screen.y - 2, '+---+---+', 'rock');
+        text(screen.x - 5, screen.y - 1, '|   []  |', 'village');
+        text(screen.x - 5, screen.y, '+---+---+', 'rock');
+      }
+    }
+
+    for (const landmark of state.world.landmarks ?? []) {
+      const screen = this.project(landmark, camera);
+      if (landmark.type === 'ship') {
+        text(screen.x - 7, screen.y - 3, '    |\\', 'village');
+        text(screen.x - 7, screen.y - 2, ' ___|_\\___', 'village');
+        text(screen.x - 7, screen.y - 1, '/_________\\', 'village');
+        text(screen.x - 7, screen.y, '  ~  ~  ~', 'water');
+      } else if (landmark.type === 'house') {
+        text(screen.x - 4, screen.y - 3, '  /\\  ', 'village');
+        text(screen.x - 4, screen.y - 2, ' /##\\ ', 'village');
+        text(screen.x - 4, screen.y - 1, '|_[]_|', 'village');
+        text(screen.x - 4, screen.y, '|_||_|', 'rock');
+      } else if (landmark.type === 'tower') {
+        text(screen.x - 4, screen.y - 5, ' /^^\\ ', 'undead');
+        text(screen.x - 4, screen.y - 4, '|+--+|', 'undead');
+        text(screen.x - 4, screen.y - 3, '| () |', 'ghost');
+        text(screen.x - 4, screen.y - 2, '|+--+|', 'undead');
+        text(screen.x - 4, screen.y - 1, '| || |', 'undead');
+        text(screen.x - 4, screen.y, '/_||_\\', 'rock');
+      } else if (landmark.type === 'cemetery') {
+        text(screen.x - 5, screen.y - 2, '_+_  _+_', 'undead');
+        text(screen.x - 5, screen.y - 1, ' |    | ', 'undead');
+        text(screen.x - 5, screen.y, '_|_  _|_', 'rock');
+      }
+    }
+
+    if (state.objectiveTarget) {
+      const screen = this.project(state.objectiveTarget, camera);
+      const bounce = Math.floor(now / 240) % 2;
+      text(screen.x - 1, screen.y - 7 - bounce, '\\|/', 'amber');
+      text(screen.x, screen.y - 6 - bounce, 'V', 'amber');
+      for (const point of ringPoints(state.objectiveTarget, 1.7, 18)) {
+        const ringScreen = this.project(point, camera);
+        plot(ringScreen.x, ringScreen.y, '+', 'amber');
+      }
+    }
+
+    const hubScreen = this.project(state.world.hub, camera);
+    const flame = Math.floor(now / 180) % 2 ? '^' : '*';
+    text(hubScreen.x - 3, hubScreen.y - 2, '  ' + flame + '  ', 'fire');
+    text(hubScreen.x - 3, hubScreen.y - 1, ' /|\\ ', 'fire');
+    text(hubScreen.x - 3, hubScreen.y, '[_#_]', 'rock');
+
+    for (const chest of state.world.chests.filter((item) => item.active && !item.opened)) {
+      const screen = this.project(chest, camera);
+      text(screen.x - 3, screen.y - 1, '.----.', 'amber');
+      text(screen.x - 3, screen.y, '|_[]_|', 'amber');
     }
 
     for (const enemy of state.enemies.sort((a, b) => a.x + a.y - (b.x + b.y))) {
@@ -250,12 +377,12 @@ export class AsciiRenderer {
     }
 
     const player = this.project(visualCamera, camera);
-    const walking = Boolean(state.player.motion);
+    const walking = Boolean(state.player.moving);
     const casting = now < (state.player.castUntil ?? 0);
     const animationMode = casting ? 'cast' : walking ? 'walk' : 'idle';
     const animationFrame = casting
       ? Math.floor((now - state.player.castStartedAt) / 65)
-      : walking ? Math.floor((state.player.motion.progress ?? 0) * 4) : Math.floor(now / 420);
+      : walking ? Math.floor(state.player.walkFrame * 2.4) : Math.floor(now / 420);
     const bob = walking && animationFrame % 2 ? -1 : 0;
     const playerSprite = playerSpriteFor(state.player, { mode: animationMode, frame: animationFrame });
     playerSprite.forEach((line, row) => text(player.x - Math.floor(line.length / 2), player.y - 5 + row + bob, line, 'player'));

@@ -53,7 +53,7 @@ export function applyReusableSpellAnimation(state, spellName, origin, target, no
   const explosion = EXPLOSIONS[spellName];
   if (explosion && phase !== 'cast') spawnSphericalExplosion(state, target, now, explosion);
   const pulse = PULSES[spellName];
-  if (pulse && phase !== 'cast') spawnSpherePulse(state, target, now, pulse);
+  if (pulse && phase !== 'cast') spawnSpherePulse(state, target, now, { ...pulse, followActor: pulse.followPlayer ? origin : null });
   const lighting = LIGHTING[spellName];
   if (lighting && phase !== 'impact') spawnLighting(state, now, lighting);
   return Boolean(tornado || rift || explosion || pulse || lighting);

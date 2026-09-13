@@ -78,7 +78,7 @@ function signaturePoints(animation, now) {
   const profile = animation.profile;
   const t = clamp01((now - animation.createdAt) / profile.duration);
   const phase = t * Math.PI * 2;
-  const center = animation.followPlayer && animation.player ? animation.player : animation.target;
+  const center = animation.followActor ?? (animation.followPlayer && animation.player ? animation.player : animation.target);
   const points = [];
 
   switch (profile.motif) {
@@ -194,7 +194,7 @@ export function spawnSignatureSpell(state, spellName, origin, target, now, optio
   const profile = SIGNATURES[spellName];
   if (!profile) return false;
   state.animations ??= [];
-  state.animations.push({ type: 'signature-spell', spellName, profile, origin: { x: origin.x, y: origin.y }, target: { x: target.x, y: target.y }, followPlayer: options.followPlayer ?? (spellName === 'Водяная сфера' || spellName === 'Воздушное зеркало'), createdAt: now, expiresAt: now + profile.duration });
+  state.animations.push({ type: 'signature-spell', spellName, profile, origin: { x: origin.x, y: origin.y }, target: { x: target.x, y: target.y }, followPlayer: options.followPlayer ?? (spellName === 'Водяная сфера' || spellName === 'Воздушное зеркало'), followActor: options.followActor ?? null, createdAt: now, expiresAt: now + profile.duration });
   return true;
 }
 

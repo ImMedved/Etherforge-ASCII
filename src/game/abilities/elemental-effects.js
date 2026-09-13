@@ -1,38 +1,36 @@
-function pushEnemy(enemy, center, strength, world) {
-  const dx = Math.sign(enemy.x - center.x) || 1;
-  const dy = Math.sign(enemy.y - center.y);
-  for (let step = 0; step < strength; step += 1) {
-    const nx = enemy.x + dx;
-    const ny = enemy.y + dy;
-    if (!world.isPassable(Math.round(nx), Math.round(ny))) break;
-    enemy.x = nx;
-    enemy.y = ny;
-  }
+import { damageEntity } from '../combat-feedback.js';
+import { moveActor, normalizeVector } from '../movement.js';
+
+function pushActor(actor, center, strength, world) {
+  const direction = normalizeVector({ x: actor.x - center.x, y: actor.y - center.y }) ?? { x: 1, y: 0 };
+  moveActor(actor, { x: direction.x * strength, y: direction.y * strength }, world);
 }
 
-export function applyElementalHit(state, enemy, hit, now) {
+export function applyElementalHit(state, actor, hit, now, context = null) {
   const elementIds = hit.elements.map((element) => typeof element === 'string' ? element : element.id);
-  const vulnerability = (enemy.vulnerableUntil ?? 0) > now ? 1.35 : 1;
+  const vulnerability = (actor.vulnerableUntil ?? 0) > now ? 1.35 : 1;
   const damage = Math.max(1, Math.round(hit.damage * vulnerability));
-  damageEntity(state, enemy, damage, now);
+  if (context?.damage) context.damage(actor, damage, now, { elements: elementIds });
+  else damageEntity(state, actor, damage, now);
 
   if (elementIds.includes('fire')) {
-    enemy.burnUntil = Math.max(enemy.burnUntil, now + 1500 + hit.level * 260);
-    enemy.nextBurnTick = now + 420;
+    const durationScale = 1 + Math.max(0, context?.owner?.effectDurationBonus ?? 0);
+    actor.burnUntil = Math.max(actor.burnUntil ?? 0, now + (1500 + hit.level * 260) * durationScale);
+    actor.nextBurnTick = now + 420;
   }
   if (elementIds.includes('water')) {
-    enemy.slowedUntil = Math.max(enemy.slowedUntil, now + 800 + hit.level * 210);
+    const durationScale = 1 + Math.max(0, context?.owner?.effectDurationBonus ?? 0);
+    actor.slowedUntil = Math.max(actor.slowedUntil ?? 0, now + (800 + hit.level * 210) * durationScale);
   }
   if (elementIds.includes('water') && elementIds.includes('fire')) {
-    enemy.steamUntil = Math.max(enemy.steamUntil ?? 0, now + 1200 + hit.level * 220);
+    actor.steamUntil = Math.max(actor.steamUntil ?? 0, now + 1200 + hit.level * 220);
   }
   if (elementIds.includes('earth')) {
-    enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 180 + hit.level * 90);
+    actor.stunnedUntil = Math.max(actor.stunnedUntil ?? 0, now + 180 + hit.level * 90);
   }
   if (elementIds.includes('air')) {
-    pushEnemy(enemy, hit.origin, Math.max(1, Math.ceil(hit.level / 2)), state.world);
+    pushActor(actor, hit.origin, Math.max(1, Math.ceil(hit.level / 2)), state.world);
   }
 
   return damage;
 }
-import { damageEntity } from '../combat-feedback.js';

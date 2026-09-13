@@ -65,6 +65,14 @@ const BOOK = {
 
 const keyRank = new Map(ELEMENT_ORDER.map((id, index) => [id, index]));
 
+function resourceProfile(name, level, sameElement) {
+  const nameVariation = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5;
+  return {
+    manaCost: 5 + level * 7 + (sameElement ? 2 : 0),
+    cooldownMs: 450 + level * 260 + nameVariation * 90,
+  };
+}
+
 export function pairKey(firstId, secondId) {
   return [firstId, secondId].sort((a, b) => keyRank.get(a) - keyRank.get(b)).join('-');
 }
@@ -75,6 +83,7 @@ export function getSpell(firstKey, secondKey, level) {
   const entry = first && second ? BOOK[level]?.[pairKey(first.id, second.id)] : null;
   if (!entry) return null;
   const sameElement = first.id === second.id;
+  const resources = resourceProfile(entry[0], Number(level), sameElement);
   return {
     id: `${pairKey(first.id, second.id)}-${level}`,
     name: entry[0],
@@ -84,6 +93,7 @@ export function getSpell(firstKey, secondKey, level) {
     damage: 7 + Number(level) * 8 + (sameElement ? 4 : 0),
     radius: Math.min(1 + Math.floor(Number(level) / 2), 4),
     code: `${firstKey}${secondKey}${level}`,
+    ...resources,
   };
 }
 

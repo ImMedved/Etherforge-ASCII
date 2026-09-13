@@ -5,6 +5,13 @@ export const SEA_DEPTH = 6;
 export const PLAYER_MAX_HEALTH = 100;
 export const INITIAL_ENEMY_COUNT = 4;
 export const SPELL_RANGE_MULTIPLIER = 1.5;
+export const PLAYER_MOVE_SPEED = 6;
+export const PLAYER_COLLISION_RADIUS = 0.32;
+export const PLAYER_MAX_MANA = 100;
+export const PLAYER_MANA_REGEN = 11;
+export const DASH_DURATION_MS = 180;
+export const DASH_COOLDOWN_MS = 1100;
+export const DASH_SPEED_MULTIPLIER = 3.25;
 
 export const ELEMENTS = Object.freeze({
   1: { id: 'air', name: 'Воздух', short: 'ВОЗ', color: 'air', glyph: ')' },

@@ -10,7 +10,7 @@ export function levelTwoImmediateDamageMultiplier(spellName) {
   return 1;
 }
 
-export function applyLevelTwoMechanics(state, spell, targets, center, now) {
+export function applyLevelTwoMechanics(state, spell, targets, center, now, owner = state.player, team = 'player') {
   if (spell.level !== 2) return false;
 
   if (spell.name === 'Циркуляция') {
@@ -20,12 +20,12 @@ export function applyLevelTwoMechanics(state, spell, targets, center, now) {
     state.fields.push({
       x: center.x, y: center.y, radius: 2.5, damage: Math.round(spell.damage * .9),
       color: 'water', glyph: 'O', nextTick: now + 1100, expiresAt: now + 1350,
-      remainingTicks: 1,
+      remainingTicks: 1, owner, team,
     });
   } else if (spell.name === 'Линза') {
-    state.player.shield = Math.min(90, state.player.shield + 10);
+    owner.shield = Math.min(90, (owner.shield ?? 0) + 10);
   } else if (spell.name === 'Грязевой щит') {
-    state.player.shield = Math.min(90, state.player.shield + 18);
+    owner.shield = Math.min(90, (owner.shield ?? 0) + 18);
   } else if (spell.name === 'Сковывание') {
     for (const enemy of targets) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 2300);
   }

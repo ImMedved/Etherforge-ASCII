@@ -1,25 +1,18 @@
+import { moveActor, normalizeVector } from '../movement.js';
+
 const SELF_CENTERED = /осьминог|водяная сфера|щит|линза|зеркало/i;
 const PULLING = /торнадо|смерч|водоворот|циркуляция/i;
 const HARD_CONTROL = /давление океана|сковывание|резонанс|тектонический сдвиг|атмосферный коллапс|абсолютная тишина/i;
 
 export function abilityTarget(spell, player, requestedTarget) {
   return SELF_CENTERED.test(spell.name)
-    ? { x: Math.round(player.x), y: Math.round(player.y) }
+    ? { x: player.x, y: player.y }
     : requestedTarget;
 }
 
-function pullToward(enemy, center, world, steps) {
-  for (let step = 0; step < steps; step += 1) {
-    const dx = Math.sign(center.x - enemy.x);
-    const dy = Math.sign(center.y - enemy.y);
-    const options = Math.abs(center.x - enemy.x) >= Math.abs(center.y - enemy.y)
-      ? [{ x: enemy.x + dx, y: enemy.y }, { x: enemy.x, y: enemy.y + dy }]
-      : [{ x: enemy.x, y: enemy.y + dy }, { x: enemy.x + dx, y: enemy.y }];
-    const next = options.find((point) => world.isPassable(point.x, point.y));
-    if (!next || (next.x === enemy.x && next.y === enemy.y)) break;
-    enemy.x = next.x;
-    enemy.y = next.y;
-  }
+function pullToward(actor, center, world, strength) {
+  const direction = normalizeVector({ x: center.x - actor.x, y: center.y - actor.y });
+  if (direction) moveActor(actor, { x: direction.x * strength, y: direction.y * strength }, world);
 }
 
 export function applyAreaAbilityMechanics(state, spell, targets, center, now) {

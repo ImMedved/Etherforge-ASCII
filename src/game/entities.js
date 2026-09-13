@@ -1,10 +1,10 @@
 let enemySerial = 0;
 
 export const ENEMY_ARCHETYPES = Object.freeze({
-  wolf: Object.freeze({ id: 'wolf', name: 'Дикий волк', maxHealth: 30, moveInterval: 220, damage: 2, attackInterval: 800, visionRange: 28 }),
-  goblin: Object.freeze({ id: 'goblin', name: 'Гоблин-разведчик', maxHealth: 46, moveInterval: 360, damage: 4, attackInterval: 1100, visionRange: 24 }),
-  orc: Object.freeze({ id: 'orc', name: 'Орк-налётчик', maxHealth: 78, moveInterval: 620, damage: 7, attackInterval: 1650, visionRange: 22 }),
-  ghost: Object.freeze({ id: 'ghost', name: 'Блуждающий призрак', maxHealth: 38, moveInterval: 280, damage: 3, attackInterval: 950, visionRange: 30, flying: true }),
+  wolf: Object.freeze({ id: 'wolf', name: 'Дикий волк', maxHealth: 30, moveSpeed: 4.55, damage: 2, attackInterval: 800, visionRange: 28 }),
+  goblin: Object.freeze({ id: 'goblin', name: 'Гоблин-разведчик', maxHealth: 46, moveSpeed: 2.78, damage: 4, attackInterval: 1100, visionRange: 24, ability: { code: [2, 2, 1], range: 11, interval: 3600, telegraphMs: 850, power: 0.38 } }),
+  orc: Object.freeze({ id: 'orc', name: 'Орк-налётчик', maxHealth: 78, moveSpeed: 1.61, damage: 7, attackInterval: 1650, visionRange: 22, ability: { code: [4, 4, 1], range: 9, interval: 4800, telegraphMs: 1100, power: 0.32 } }),
+  ghost: Object.freeze({ id: 'ghost', name: 'Блуждающий призрак', maxHealth: 38, moveSpeed: 3.57, damage: 3, attackInterval: 950, visionRange: 30, flying: true, ability: { code: [1, 1, 1], range: 12, interval: 3200, telegraphMs: 700, power: 0.35 } }),
 });
 
 const ENEMY_TYPE_ORDER = ['wolf', 'goblin', 'orc', 'ghost'];
@@ -18,20 +18,24 @@ export function createEnemy(position, threat = 1, requestedType = null) {
     id: `enemy-${enemySerial}`,
     type: archetype.id,
     name: archetype.name,
+    team: 'enemy',
     x: position.x,
     y: position.y,
     hp: maxHealth,
     maxHealth,
-    moveInterval: archetype.moveInterval,
+    moveSpeed: archetype.moveSpeed,
+    collisionRadius: archetype.id === 'orc' ? 0.42 : 0.32,
     damage: archetype.damage,
     attackInterval: archetype.attackInterval,
     visionRange: archetype.visionRange,
     flying: archetype.flying ?? false,
+    ability: archetype.ability ? { ...archetype.ability } : null,
+    pendingAbility: null,
+    nextAbilityAt: 0,
     burnUntil: 0,
     nextBurnTick: 0,
     slowedUntil: 0,
     stunnedUntil: 0,
-    nextMoveAt: 0,
     nextAttackAt: 0,
   };
 }

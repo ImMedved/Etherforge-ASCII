@@ -5,58 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#07110d" />
     <title>ASCII Arcana</title>
-    <link rel="stylesheet" href="./src/styles/main.css?v=20260909-2" />
+    <link rel="stylesheet" href="./src/styles/main.css?v=20260912-4" />
   </head>
   <body>
     <div class="scanlines" aria-hidden="true"></div>
     <main class="app-shell">
-      <header class="masthead">
-        <div>
-          <p class="eyebrow">FIELD TERMINAL / COASTAL SECTOR 01</p>
-          <h1>ASCII ARCANA</h1>
-        </div>
-        <div class="world-state">
-          <span class="signal"></span>
-          <span id="world-status">МИР СТАБИЛЕН</span>
-        </div>
-      </header>
-
       <section class="game-layout">
         <div class="viewport-frame">
           <canvas id="viewport" tabindex="0" aria-label="Игровое поле ASCII"></canvas>
           <div class="viewport-label hud-top">
-            <span>ИЗОМЕТРИЧЕСКИЙ КАНАЛ</span>
+            <span id="world-status">ЭКСПЕДИЦИЯ / ПОБЕРЕЖЬЕ</span>
             <span id="coordinates">X:00 Y:00</span>
           </div>
           <div class="player-hud">
             <span>HP <strong id="health-label">100 / 100</strong></span>
             <span class="mini-bar"><i id="health-bar"></i></span>
+            <span>MP <strong id="mana-label">100 / 100</strong></span>
+            <span class="mini-bar mana"><i id="mana-bar"></i></span>
             <span>ЩИТ <strong id="shield-label">0</strong></span>
             <span id="kill-count">ЦЕЛЕЙ: 0</span>
+            <span id="dash-status" class="ready">РЫВОК ГОТОВ</span>
           </div>
           <div id="sphere-levels" class="sphere-levels"></div>
+          <div class="objective-hud"><span>ТЕКУЩАЯ ЗАДАЧА</span><strong id="objective-text">Найдите сферу Воздуха</strong></div>
           <section class="combat-log floating-log">
             <ol id="combat-log"></ol>
           </section>
           <section class="cast-dock">
-            <div class="cast-header"><span>ФОРМУЛА</span><span id="unlock-label">ЗАБЛОКИРОВАНО</span></div>
             <div id="sequence" class="sequence" aria-live="polite">
               <span>?</span><b>+</b><span>?</span><b>+</b><span>?</span>
             </div>
             <div class="prepared-inline">
               <span id="spell-code">---</span>
               <strong id="spell-name">Нет заклинания</strong>
-              <span id="spell-description">Подберите стихийную сферу.</span>
-              <div id="spell-tags" class="spell-tags"></div>
+              <span id="spell-resource-status" class="spell-resource-status">МАНА И КУЛДАУН —</span>
             </div>
             <div class="rune-key">
               <span><kbd>1</kbd> ВОЗДУХ</span><span><kbd>2</kbd> ОГОНЬ</span>
               <span><kbd>3</kbd> ВОДА</span><span><kbd>4</kbd> ЗЕМЛЯ</span>
             </div>
           </section>
+          <section class="action-dock" aria-label="Быстрые слоты и пояс">
+            <div><span class="dock-label">ЧАРЫ</span><div id="quick-slots" class="slot-row"></div></div>
+            <div><span class="dock-label">ПОЯС</span><div id="belt-slots" class="slot-row belt-row"></div></div>
+          </section>
           <div class="viewport-footer hud-bottom">
             <span id="status-line">Найдите четыре стихийные сферы.</span>
-            <span>WASD: ХОД · ЛКМ: КАСТ · Q: СБРОС · E/R: МЕНЮ</span>
+            <span>WASD · F: ДЕЙСТВИЕ · ЛКМ: КАСТ · J/I/C: МЕНЮ · K: КЛАВИШИ · `: DEV</span>
           </div>
         </div>
       </section>
@@ -72,6 +67,6 @@
       </section>
     </div>
 
-    <script type="module" src="./src/main.js?v=20260909-2"></script>
+    <script type="module" src="./src/main.js?v=20260912-4"></script>
   </body>
 </html>

@@ -6,6 +6,7 @@ import { applyAdvancedHitMechanics } from './advanced-abilities.js';
 import { addAdvancedProjectileImpactVisuals } from './advanced-visuals.js';
 import { applyReusableProjectileAnimation } from '../animations/spell-presets.js';
 import { spawnProjectileSignature } from '../animations/signature-spells.js';
+import { actorTeam, hostileActors } from '../actor-abilities.js';
 
 let projectileSerial = 0;
 
@@ -49,6 +50,9 @@ export function spawnProjectile(state, origin, target, spec, now) {
     range: spec.range,
     travelled: 0,
     damage: spec.damage,
+    owner: spec.owner ?? state.player,
+    team: spec.team ?? actorTeam(state, spec.owner ?? state.player),
+    context: spec.context ?? null,
     spellName: spec.spellName,
     level: spec.level,
     elements: spec.elements,
@@ -85,28 +89,28 @@ function addImpactEffect(state, projectile, now) {
 
 function applySplash(state, projectile, directTarget, now) {
   const targets = projectile.splashRadius > 0
-    ? state.enemies.filter((enemy) => !projectile.hitIds.has(enemy.id)
-      && enemy !== directTarget
-      && distance(projectile, enemy) <= projectile.splashRadius + 0.6)
+    ? hostileActors(state, projectile.team).filter((actor) => !projectile.hitIds.has(actor.id)
+      && actor !== directTarget
+      && distance(projectile, actor) <= projectile.splashRadius + 0.6)
     : [];
   if (directTarget && !projectile.hitIds.has(directTarget.id)) targets.unshift(directTarget);
 
-  for (const enemy of targets) {
-    projectile.hitIds.add(enemy.id);
-    const falloff = directTarget === enemy ? 1 : Math.max(0.55, 1 - distance(projectile, enemy) * 0.18);
-    applyElementalHit(state, enemy, {
+  for (const actor of targets) {
+    projectile.hitIds.add(actor.id);
+    const falloff = directTarget === actor ? 1 : Math.max(0.55, 1 - distance(projectile, actor) * 0.18);
+    applyElementalHit(state, actor, {
       damage: projectile.damage * falloff,
       elements: projectile.elements,
       level: projectile.level,
       origin: { x: projectile.x, y: projectile.y },
-    }, now);
-    applyAdvancedHitMechanics(state, enemy, projectile.spellName, projectile.level, projectile, now);
+    }, now, projectile.context);
+    applyAdvancedHitMechanics(state, actor, projectile.spellName, projectile.level, projectile, now);
   }
 }
 
 function retargetChain(state, projectile) {
-  const next = state.enemies
-    .filter((enemy) => enemy.hp > 0 && !projectile.hitIds.has(enemy.id) && distance(projectile, enemy) <= 6)
+  const next = hostileActors(state, projectile.team)
+    .filter((actor) => !projectile.hitIds.has(actor.id) && distance(projectile, actor) <= 6)
     .sort((a, b) => distance(projectile, a) - distance(projectile, b))[0];
   if (!next) return false;
   const direction = normalizedDirection(projectile, next);
@@ -146,11 +150,11 @@ export function updateProjectiles(state, now, deltaMs) {
       projectile.nextTrailAt = now + 45;
     }
 
-    const hit = state.enemies
-      .filter((enemy) => enemy.hp > 0 && !projectile.hitIds.has(enemy.id))
-      .map((enemy) => ({ enemy, contact: distanceToSegment(enemy, previous, projectile) }))
+    const hit = hostileActors(state, projectile.team)
+      .filter((actor) => !projectile.hitIds.has(actor.id))
+      .map((actor) => ({ actor, contact: distanceToSegment(actor, previous, projectile) }))
       .filter(({ contact }) => contact.distance <= projectile.hitRadius + 0.9)
-      .sort((a, b) => a.contact.progress - b.contact.progress)[0]?.enemy;
+      .sort((a, b) => a.contact.progress - b.contact.progress)[0]?.actor;
 
     if (hit) {
       applySplash(state, projectile, hit, now);

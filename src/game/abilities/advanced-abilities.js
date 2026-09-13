@@ -1,4 +1,5 @@
 import { damageEntity, healEntity } from '../combat-feedback.js';
+import { moveActor, normalizeVector } from '../movement.js';
 
 export const ADVANCED_SPELLS = Object.freeze([
   'Вакуумный карман', 'Горячий воздух', 'Давление океана', 'Воздушная пуля', 'Живой огонь',
@@ -16,15 +17,9 @@ export function advancedImmediateDamageMultiplier(spellName) {
   return 1;
 }
 
-function pushAway(state, enemy, center, steps = 1) {
-  const dx = Math.sign(enemy.x - center.x) || 1;
-  const dy = Math.sign(enemy.y - center.y);
-  for (let step = 0; step < steps; step += 1) {
-    const next = { x: enemy.x + dx, y: enemy.y + dy };
-    if (!state.world.isPassable(next.x, next.y)) break;
-    enemy.x = next.x;
-    enemy.y = next.y;
-  }
+function pushAway(state, actor, center, strength = 1) {
+  const direction = normalizeVector({ x: actor.x - center.x, y: actor.y - center.y }) ?? { x: 1, y: 0 };
+  moveActor(actor, { x: direction.x * strength, y: direction.y * strength }, state.world);
 }
 
 function prolongBurn(enemy, now, duration) {
@@ -52,7 +47,7 @@ export function applyAdvancedHitMechanics(state, enemy, spellName, level, center
   return level >= 3;
 }
 
-export function applyAdvancedAreaMechanics(state, spell, targets, center, now) {
+export function applyAdvancedAreaMechanics(state, spell, targets, center, now, owner = state.player, team = 'player') {
   if (spell.level < 3) return false;
 
   if (spell.name === 'Вакуумный карман') {
@@ -81,7 +76,7 @@ export function applyAdvancedAreaMechanics(state, spell, targets, center, now) {
     }
   } else if (spell.name === 'Подземный взрыв') {
     for (const enemy of targets) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 900);
-    state.fields.push({ x: center.x, y: center.y, radius: 3, damage: 4, color: 'earth', glyph: ':', nextTick: now + 600, expiresAt: now + 2800 });
+    state.fields.push({ x: center.x, y: center.y, radius: 3, damage: 4, color: 'earth', glyph: ':', nextTick: now + 600, expiresAt: now + 2800, owner, team });
   } else if (spell.name === 'Торнадо' || spell.name === 'Водоворот') {
     for (const enemy of targets) enemy.slowedUntil = Math.max(enemy.slowedUntil, now + 4200);
   } else if (spell.name === 'Огненный смерч') {
@@ -103,26 +98,26 @@ export function applyAdvancedAreaMechanics(state, spell, targets, center, now) {
       pushAway(state, enemy, center, 3);
     }
   } else if (spell.name === 'Воздушное зеркало') {
-    state.player.shield = Math.min(120, state.player.shield + 55);
-    state.player.reflectUntil = Math.max(state.player.reflectUntil ?? 0, now + 6500);
+    owner.shield = Math.min(120, (owner.shield ?? 0) + 55);
+    owner.reflectUntil = Math.max(owner.reflectUntil ?? 0, now + 6500);
   } else if (spell.name === 'Абсолютная тишина') {
     for (const enemy of targets) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 4200);
   } else if (spell.name === 'Солнцепад') {
     for (const enemy of targets) prolongBurn(enemy, now, 6000);
-    state.fields.push({ x: center.x, y: center.y, radius: 4, damage: 7, color: 'fire', glyph: '^', nextTick: now + 500, expiresAt: now + 3200 });
+    state.fields.push({ x: center.x, y: center.y, radius: 4, damage: 7, color: 'fire', glyph: '^', nextTick: now + 500, expiresAt: now + 3200, owner, team });
   } else if (spell.name === 'Магматический катаклизм') {
     for (const enemy of targets) {
       prolongBurn(enemy, now, 5500);
       enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 1500);
     }
   } else if (spell.name === 'Водяная сфера') {
-    healEntity(state, state.player, 24, now);
-    state.player.shield = Math.min(120, state.player.shield + 24);
+    healEntity(state, owner, 24, now);
+    owner.shield = Math.min(120, (owner.shield ?? 0) + 24);
     state.fields = state.fields.filter((field) => field.sourceSpell !== 'Водяная сфера');
     state.fields.push({
-      x: state.player.x, y: state.player.y, radius: 4, damage: 6,
+      x: owner.x, y: owner.y, radius: 4, damage: 6,
       color: 'water', glyph: 'O', nextTick: now + 450, expiresAt: now + 4800,
-      sourceSpell: 'Водяная сфера', followPlayer: true,
+      sourceSpell: 'Водяная сфера', followOwner: true, followPlayer: owner === state.player, owner, team,
     });
   } else if (spell.name === 'Геошторм') {
     for (const enemy of targets) enemy.stunnedUntil = Math.max(enemy.stunnedUntil, now + 2400);
@@ -130,7 +125,7 @@ export function applyAdvancedAreaMechanics(state, spell, targets, center, now) {
   return true;
 }
 
-export function reflectedMeleeDamage(state, source, receivedDamage, now) {
-  if (!source || (state.player.reflectUntil ?? 0) <= now || receivedDamage <= 0) return 0;
+export function reflectedMeleeDamage(state, source, receivedDamage, now, defender = state.player) {
+  if (!source || (defender.reflectUntil ?? 0) <= now || receivedDamage <= 0) return 0;
   return damageEntity(state, source, Math.max(1, Math.round(receivedDamage * 1.5)), now);
 }

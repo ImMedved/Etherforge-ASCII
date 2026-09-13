@@ -40,3 +40,13 @@ test('a collected sphere respawns on another passable unoccupied tile', () => {
   assert.ok(Math.hypot(sphere.x - 29, sphere.y - 32) >= 5);
   assert.notDeepEqual({ x: sphere.x, y: sphere.y }, before);
 });
+
+test('large village houses have solid walls, a door and a detectable interior', () => {
+  const world = createWorld();
+  const house = world.houses[0];
+  assert.ok(house.halfWidth >= 4 && house.halfHeight >= 3);
+  assert.equal(world.isPassable(house.x + house.halfWidth, house.y), false);
+  assert.equal(world.isPassable(house.door.x, house.door.y), true);
+  assert.equal(world.houseAt({ x: house.x, y: house.y })?.id, house.id);
+  assert.equal(world.houseAt({ x: house.x + house.halfWidth + 1, y: house.y }), null);
+});

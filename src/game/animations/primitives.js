@@ -25,7 +25,7 @@ export function spawnSphericalExplosion(state, center, now, options = {}) {
 
 export function spawnSpherePulse(state, center, now, options = {}) {
   state.animations ??= [];
-  state.animations.push({ type: 'sphere-pulse', x: center.x, y: center.y, colors: options.colors ?? ['water', 'air'], radius: options.radius ?? 3, rings: options.rings ?? 3, glyphs: options.glyphs ?? ['O', 'o', '.', '+'], followPlayer: options.followPlayer ?? false, createdAt: now, expiresAt: now + (options.duration ?? 1300) });
+  state.animations.push({ type: 'sphere-pulse', x: center.x, y: center.y, colors: options.colors ?? ['water', 'air'], radius: options.radius ?? 3, rings: options.rings ?? 3, glyphs: options.glyphs ?? ['O', 'o', '.', '+'], followPlayer: options.followPlayer ?? false, followActor: options.followActor ?? null, createdAt: now, expiresAt: now + (options.duration ?? 1300) });
 }
 
 export function spawnLighting(state, now, options = {}) {
@@ -91,7 +91,7 @@ function sampleExplosion(animation, now) {
 
 function samplePulse(animation, now, player) {
   const t = progress(animation, now);
-  const center = animation.followPlayer && player ? player : animation;
+  const center = animation.followActor ?? (animation.followPlayer && player ? player : animation);
   const points = [];
   for (let ring = 0; ring < animation.rings; ring += 1) {
     const phase = (t + ring / animation.rings) % 1;
